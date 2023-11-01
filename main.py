@@ -1,5 +1,6 @@
 from collections import UserDict
 from datetime import datetime, timedelta
+import json
 
 class Field:
     def __init__(self, value=None):
@@ -13,10 +14,11 @@ class Field:
     def value(self, new_value):
         self._value = new_value
 
+    def __str__(self):
+        return str(self._value)
 
 class Name(Field):
-    def __str__(self):
-        return self._value
+    pass
 
 
 class Phone(Field):
@@ -26,8 +28,8 @@ class Phone(Field):
             raise ValueError("Phone number must have 10 digits and contain only numbers.")
         self._value = new_value
 
-    def __str__(self):
-        return str(self._value)
+    # def __str__(self):
+    #     return str(self._value)
 
 
 class Birthday(Field):
@@ -81,9 +83,11 @@ class Record:
 
 
 class AddressBook(UserDict):
+    SAVE_FILE = 'addressbook.json'
     def __init__(self, page_size=5):
         super().__init__()
         self.page_size = page_size
+        
 
     def __iter__(self):
         return AddressBookIterator(self.data.values(), self.page_size)
@@ -97,6 +101,30 @@ class AddressBook(UserDict):
     def delete(self, name: str):
         if name in self.data:
             del self.data[name]
+
+    def save_to_disk(self):
+        with open(self.SAVE_FILE, 'w') as file:
+            json_data = {}
+            for key, record in self.data.items():
+                json_data[key] = {
+                    'name': str(record.name.value),
+                    'phones': record.phones,
+                    'birthday': record.birthday.value if record.birthday else None
+                }
+            json.dump(json_data, file)
+
+    def load_from_disk(self):
+        try:
+            with open(self.SAVE_FILE, 'r') as file:
+                json_data = json.load(file)
+                for key, data in json_data.items():
+                    record = Record(data['name'], data['birthday'])
+                    for phone in data['phones']:
+                        record.add_phone(phone)
+                    self.data[key] = record
+        except FileNotFoundError:
+            with open(self.SAVE_FILE, 'w') as file:
+                json.dump({}, file)
 
 class AddressBookIterator:
     def __init__(self, records, page_size):
@@ -146,6 +174,7 @@ def add(address_book: AddressBook, name, phone, birthday=None):
         new_record = Record(name_obj, birthday)
         new_record.add_phone(phone_obj)
         address_book.add_record(new_record)
+    address_book.save_to_disk()
 
     return "Contact added!"
 
@@ -163,6 +192,8 @@ def change(address_book: AddressBook, name, old_phone, new_phone):
         raise ValueError("Old phone number not found!")
 
     record.edit_phone(old_phone_obj, new_phone_obj)
+    address_book.save_to_disk()
+
     return "Phone number changed!"
 
 
@@ -188,6 +219,8 @@ def remove_phone(address_book: AddressBook, name, phone):
         raise ValueError("Phone number not found!")
 
     record.remove_phone(phone_obj)
+    address_book.save_to_disk()
+
     return "Phone number removed!"
 
 
@@ -208,6 +241,8 @@ def delete_record(address_book: AddressBook, name):
         raise KeyError("Record not found!")
 
     address_book.delete(name)
+    address_book.save_to_disk()
+
     return f"Record for {name} deleted!"
 
 
@@ -269,6 +304,8 @@ COMMANDS = {
 @input_error
 def main():
     address_book = AddressBook()
+    address_book.load_from_disk()
+
 
     while True:
         command = input("Enter command: ").lower()
