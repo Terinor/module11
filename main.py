@@ -126,6 +126,24 @@ class AddressBook(UserDict):
             with open(self.SAVE_FILE, 'w') as file:
                 json.dump({}, file)
 
+    def search(self, query):
+        results = []
+
+        for record in self.data.values():
+            # Шукаємо збіги у іменах
+            if query.lower() in record.name.value.lower():
+                results.append(record)
+                continue  # Якщо ми знайшли співпадіння в імені, переходимо до наступного запису
+            
+            # Шукаємо збіги у номерах телефонів
+            for phone in record.phones:
+                if query in phone:
+                    results.append(record)
+                    break  # Якщо ми знайшли співпадіння в номері телефону, переходимо до наступного запису
+
+        return results
+    
+
 class AddressBookIterator:
     def __init__(self, records, page_size):
         self.records = list(records)
@@ -225,6 +243,20 @@ def remove_phone(address_book: AddressBook, name, phone):
 
 
 @input_error
+def search_contacts(address_book: AddressBook, query):
+    results = address_book.search(query)
+    if not results:
+        return "No matches found."
+
+    output = []
+    for record in results:
+        output.append(f"{record.name.value}: {', '.join(record.phones)}")
+    
+    return "\n".join(output)
+
+
+
+@input_error
 def show_all(address_book: AddressBook, page_size=None):
     if page_size:
         address_book.page_size = int(page_size)
@@ -296,6 +328,7 @@ COMMANDS = {
     delete_record: ['delete'],
     phone: ['phone'],
     show_all: ['show all'],
+    search_contacts: ['search'],
     days_to_birthday: ['birthday'],
     good_bye: ['good bye', 'close', 'exit']
 }
